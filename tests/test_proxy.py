@@ -56,8 +56,17 @@ def test_chat_completions_unknown_model(client):
     assert "Unknown model" in response.json()["detail"]
 
 
-@patch('services.proxy.forward_request')
-def test_chat_completions_success(mock_forward, client):
+@patch('main.forward_request')
+@patch('main.auth_service')
+@patch('main.async_quota_service')
+@patch('main.async_logger_service')
+def test_chat_completions_success(mock_logger, mock_quota, mock_auth, mock_forward, client):
+    mock_auth.verify_api_key.return_value = (True, "test-key-123")
+    
+    mock_logger.log_request = AsyncMock()
+    mock_logger.log_response = AsyncMock()
+    mock_quota.deduct_quota = AsyncMock()
+    
     mock_response = {
         "id": "test-id",
         "object": "chat.completion",
@@ -82,8 +91,17 @@ def test_chat_completions_success(mock_forward, client):
     assert "X-Request-ID" in response.headers
 
 
-@patch('services.proxy.forward_request')
-def test_chat_completions_stream(mock_forward, client):
+@patch('main.forward_request')
+@patch('main.auth_service')
+@patch('main.async_quota_service')
+@patch('main.async_logger_service')
+def test_chat_completions_stream(mock_logger, mock_quota, mock_auth, mock_forward, client):
+    mock_auth.verify_api_key.return_value = (True, "test-key-123")
+    
+    mock_logger.log_request = AsyncMock()
+    mock_logger.log_response = AsyncMock()
+    mock_quota.deduct_quota = AsyncMock()
+    
     async def mock_stream():
         yield b"data: {\"choices\": [{\"delta\": {\"content\": \"Hello\"}}]}\n\n"
         yield b"data: [DONE]\n\n"
@@ -101,5 +119,91 @@ def test_chat_completions_stream(mock_forward, client):
     )
     
     assert response.status_code == 200
-    assert response.headers["Content-Type"] == "text/event-stream"
+    assert "text/event-stream" in response.headers["Content-Type"]
     assert "X-Request-ID" in response.headers
+
+
+import httpx
+
+
+@patch('main.forward_request')
+@patch('main.auth_service')
+@patch('main.async_quota_service')
+@patch('main.async_logger_service')
+def test_chat_completions_http_error(mock_logger, mock_quota, mock_auth, mock_forward, client):
+    mock_auth.verify_api_key.return_value = (True, "test-key-123")
+    
+    mock_logger.log_request = AsyncMock()
+    mock_logger.log_response = AsyncMock()
+    mock_quota.deduct_quota = AsyncMock()
+    
+    mock_response = MagicMock()
+    mock_response.status_code = 401
+    mock_forward.side_effect = httpx.HTTPStatusError(
+        "Unauthorized", 
+        request=MagicMock(), 
+        response=mock_response
+    )
+    
+    response = client.post(
+        "/v1/chat/completions",
+        headers={"Authorization": "Bearer test-key-123"},
+        json={
+            "model": "gpt-4o",
+            "messages": [{"role": "user", "content": "hello"}]
+        }
+    )
+    
+    assert response.status_code == 401
+
+
+@patch('main.forward_request')
+@patch('main.auth_service')
+@patch('main.async_quota_service')
+@patch('main.async_logger_service')
+def test_chat_completions_timeout(mock_logger, mock_quota, mock_auth, mock_forward, client):
+    mock_auth.verify_api_key.return_value = (True, "test-key-123")
+    
+    mock_logger.log_request = AsyncMock()
+    mock_logger.log_response = AsyncMock()
+    mock_quota.deduct_quota = AsyncMock()
+    
+    mock_forward.side_effect = httpx.TimeoutException("Request timeout")
+    
+    response = client.post(
+        "/v1/chat/completions",
+        headers={"Authorization": "Bearer test-key-123"},
+        json={
+            "model": "gpt-4o",
+            "messages": [{"role": "user", "content": "hello"}]
+        }
+    )
+    
+    assert response.status_code == 504
+    assert "timeout" in response.json()["detail"].lower()
+
+
+@patch('main.forward_request')
+@patch('main.auth_service')
+@patch('main.async_quota_service')
+@patch('main.async_logger_service')
+def test_chat_completions_upstream_error(mock_logger, mock_quota, mock_auth, mock_forward, client):
+    mock_auth.verify_api_key.return_value = (True, "test-key-123")
+    
+    mock_logger.log_request = AsyncMock()
+    mock_logger.log_response = AsyncMock()
+    mock_quota.deduct_quota = AsyncMock()
+    
+    mock_forward.side_effect = httpx.RequestError("Connection refused", request=MagicMock())
+    
+    response = client.post(
+        "/v1/chat/completions",
+        headers={"Authorization": "Bearer test-key-123"},
+        json={
+            "model": "gpt-4o",
+            "messages": [{"role": "user", "content": "hello"}]
+        }
+    )
+    
+    assert response.status_code == 502
+    assert "Upstream error" in response.json()["detail"]

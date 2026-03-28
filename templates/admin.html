@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Gateway Admin</title>
+    <link rel="stylesheet" href="/static/css/admin.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>🤖 AI Gateway Admin</h1>
+            <p>Manage your LLM models and API keys</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <div id="alert" class="alert"></div>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="models-tab">Models</button>
+            <button class="tab-btn" data-tab="api-keys-tab">API Keys</button>
+        </div>
+
+        <div id="models-tab" class="tab-content active">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Model Configuration</h2>
+                    <button class="btn btn-primary" onclick="openAddModelModal()">Add Model</button>
+                </div>
+                <div id="model-list" class="model-list">
+                    <div class="loading">Loading models...</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="api-keys-tab" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2>API Keys</h2>
+                    <button class="btn btn-primary" onclick="openAddApiKeyModal()">Add API Key</button>
+                </div>
+                <div id="api-key-list" class="api-key-list">
+                    <div class="loading">Loading API keys...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="model-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="model-modal-title">Add Model</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <form id="model-form">
+                <input type="hidden" id="editing-model-name" value="">
+                <div class="form-group">
+                    <label for="model-name">Model Name *</label>
+                    <input type="text" id="model-name" placeholder="e.g., gpt-4o" required>
+                </div>
+                <div class="form-group">
+                    <label for="base-url">Base URL *</label>
+                    <input type="text" id="base-url" placeholder="e.g., https://api.siliconflow.cn/v1" required>
+                </div>
+                <div class="form-group">
+                    <label for="auth-header">Auth Header</label>
+                    <input type="text" id="auth-header" placeholder="e.g., Bearer sk-xxx">
+                </div>
+                <div class="form-group">
+                    <label for="target-model">Target Model *</label>
+                    <input type="text" id="target-model" placeholder="e.g., Qwen/Qwen2.5-72B-Instruct" required>
+                </div>
+                <div class="form-group">
+                    <label for="max-tokens">Max Tokens *</label>
+                    <input type="number" id="max-tokens" value="4096" required>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="supports-stream" checked>
+                        Supports Streaming
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label for="timeout">Timeout (seconds)</label>
+                    <input type="number" id="timeout" value="60">
+                </div>
+            </form>
+            <div class="modal-footer">
+                <button class="btn" onclick="document.getElementById('model-modal').classList.remove('active')">Cancel</button>
+                <button class="btn btn-primary" onclick="saveModel()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="api-key-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add API Key</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <form id="api-key-form">
+                <div class="form-group">
+                    <label for="new-api-key">API Key *</label>
+                    <input type="text" id="new-api-key" placeholder="Enter your API key" required>
+                </div>
+            </form>
+            <div class="modal-footer">
+                <button class="btn" onclick="document.getElementById('api-key-modal').classList.remove('active')">Cancel</button>
+                <button class="btn btn-primary" onclick="addApiKey()">Add</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/admin.js"></script>
+</body>
+</html>

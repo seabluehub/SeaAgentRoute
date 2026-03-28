@@ -1,9 +1,27 @@
 import redis
 import asyncio
 import json
+import structlog
 from datetime import datetime
 from typing import Dict, Any, Optional
 from config.settings import settings
+
+# 配置 structlog
+structlog.configure(
+    processors=[
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.PositionalArgumentsFormatter(),
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.processors.JSONRenderer()
+    ],
+    context_class=dict,
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    cache_logger_on_first_use=True,
+)
+
+logger = structlog.get_logger()
 
 
 class LoggerService:
@@ -19,7 +37,7 @@ class LoggerService:
             self.redis_client.ping()
             self.enabled = True
         except Exception as e:
-            print(f"Warning: Redis connection failed, logger disabled: {e}")
+            logger.warning("Redis connection failed, logger disabled", error=str(e))
             self.redis_client = None
             self.enabled = False
     
@@ -38,6 +56,16 @@ class LoggerService:
         request_payload: Dict[str, Any],
         request_id: str
     ) -> None:
+        # 结构化日志
+        logger.info(
+            "Request received",
+            request_id=request_id,
+            api_key=api_key[:8] + "****" if len(api_key) > 8 else "****",
+            model=model,
+            payload=self._mask_sensitive(request_payload)
+        )
+        
+        # Redis 日志
         if not self.enabled:
             return
         try:
@@ -52,7 +80,7 @@ class LoggerService:
             self.redis_client.rpush("logs:requests", json.dumps(log_entry))
             self.redis_client.ltrim("logs:requests", -10000, -1)
         except Exception as e:
-            print(f"Error logging request: {e}")
+            logger.error("Error logging request to Redis", error=str(e))
     
     def log_response(
         self,
@@ -64,6 +92,19 @@ class LoggerService:
         error: Optional[str] = None,
         latency_ms: float = 0.0
     ) -> None:
+        # 结构化日志
+        logger.info(
+            "Response sent",
+            request_id=request_id,
+            api_key=api_key[:8] + "****" if len(api_key) > 8 else "****",
+            model=model,
+            success=success,
+            error=error,
+            latency_ms=latency_ms,
+            usage=response_payload.get("usage") if response_payload else None
+        )
+        
+        # Redis 日志
         if not self.enabled:
             return
         try:
@@ -81,7 +122,7 @@ class LoggerService:
             self.redis_client.rpush("logs:responses", json.dumps(log_entry))
             self.redis_client.ltrim("logs:responses", -10000, -1)
         except Exception as e:
-            print(f"Error logging response: {e}")
+            logger.error("Error logging response to Redis", error=str(e))
 
 
 class AsyncLoggerService:

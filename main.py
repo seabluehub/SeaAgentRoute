@@ -26,7 +26,7 @@ app.add_middleware(
 
 @app.get("/health")
 async def health_check():
-    redis_status = "connected" if (async_quota_service and async_logger_service.logger_service.enabled) else "disconnected"
+    redis_status = "connected" if (async_quota_service and async_logger_service and async_logger_service.logger_service.enabled) else "disconnected"
     return {
         "status": "ok",
         "version": "1.0.0",
